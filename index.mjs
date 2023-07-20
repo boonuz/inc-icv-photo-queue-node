@@ -43,7 +43,9 @@ if (args.length === 2) {
 const dir = args[2]
 const dirQueue = path.join(dir, 'queue')
 const dirProcessed = path.join(dir, 'processed')
-const dirError = path.join(dir, 'error')
+const dirUploaded = path.join(dir, 'uploaded')
+const dirProcessError = path.join(dir, 'process-error')
+const dirUploadError = path.join(dir, 'upload-error')
 const dirConfig = path.join(dir, 'config.json')
 const dirLog = path.join(dir, 'process.log')
 
@@ -63,8 +65,16 @@ if (!dirExist(dirProcessed)) {
   fs.mkdirSync(dirProcessed)
 }
 
-if (!dirExist(dirError)) {
-  fs.mkdirSync(dirError)
+if (!dirExist(dirUploaded)) {
+  fs.mkdirSync(dirUploaded)
+}
+
+if (!dirExist(dirProcessError)) {
+  fs.mkdirSync(dirProcessError)
+}
+
+if (!dirExist(dirUploadError)) {
+  fs.mkdirSync(dirUploadError)
 }
 
 // Config File
@@ -80,20 +90,64 @@ readConfig()
 log(`Start watching ${dirQueue} for *.jpg changes`)
 
 const watcher = watch(dir + '/queue/*.jpg')
-  .on('add', onFileChange)
+  .on('add', appendProcessQueue)
 
-async function onFileChange(filePath) {
+// Process Queue
+
+const processQueue = []
+let isDrainingProcessQueue = false
+
+function appendProcessQueue(filePath) {
+  processQueue.push(filePath)
+  if (!isDrainingProcessQueue) {
+    isDrainingProcessQueue = true
+    drainFileQueue()
+  }
+}
+
+async function drainFileQueue() {
+  if (processQueue.length === 0) {
+    return isDrainingProcessQueue = false
+  }
+  const filePath = processQueue.shift()
+  await processFile(filePath)
+  return await drainFileQueue()
+}
+
+// Upload Queue
+
+const uploadQueue = []
+let isDrainingUploadQueue = false
+
+function appendUploadQueue(filePath) {
+  uploadQueue.push(filePath)
+  if (!isDrainingUploadQueue) {
+    isDrainingUploadQueue = true
+    drainUploadQueue()
+  }
+}
+
+async function drainUploadQueue() {
+  if (uploadQueue.length === 0) {
+    return isDrainingUploadQueue = false
+  }
+  const filePath = uploadQueue.shift()
+  await uploadFile(filePath)
+  return await drainUploadQueue()
+}
+
+// Process File
+
+async function processFile(filePath) {
   const fileName = path.basename(filePath)
   const newFileName = `${config.queueNumber}_${random()}.jpg`
 
   // Paths
   const oldPath = path.join(dirQueue, fileName)
-  const errPath = path.join(dirError, fileName)
+  const errPath = path.join(dirProcessError, fileName)
   const newPath = path.join(dirProcessed, newFileName)
 
-  // Status
-  let isPrintSuccess = false
-  let isUploadSuccess = false
+  log(`[Start Processing] file: ${filePath}`)
 
   // Print
 
@@ -103,54 +157,57 @@ async function onFileChange(filePath) {
     newFileName
   ].join('/')
 
-  const printPromise = print(qrCodeUrl)
-
-  // Upload File
-
-  const objectKey = [
-    process.env.UPLOAD_FOLDER,
-    process.env.UPLOAD_ZONE,
-    newFileName
-  ].join('/')
-
-  const buffer = fs.readFileSync(oldPath)
-  const uploadPromise = s3Client.putObject({
-    Bucket: 'contents-inc',
-    Key: objectKey,
-    Body: buffer,
-    ContentEncoding: "base64",
-    ContentType: "image/jpg",
-    ACL: 'public-read',
-  })
-
-  // Move file
-
   try {
-    await Promise.all([
-      printPromise
-        .then(() => isPrintSuccess = true)
-        .catch(e => log(`[Error file: ${fileName}] Error printing ${e}`)),
-      uploadPromise
-        .then(() => isUploadSuccess = true)
-        .catch(e => log(`[Error file: ${fileName}] Error uploading file ${e}`)),
-    ])
-  } catch (error) {
-    log(`Error processing file ${fileName}`)
-    log(error)
-  }
-
-  if (isPrintSuccess && isUploadSuccess) {
+    await print(qrCodeUrl)
+    // Move File
     fs.renameSync(oldPath, newPath)
     // Save Config
     log(`[Success Q: ${config.queueNumber}] Processed file ${fileName} > ${newFileName}`)
     config.queueNumber += 1
     saveConfig()
-  } else {
+    appendUploadQueue(newPath)
+  } catch (error) {
     fs.renameSync(oldPath, errPath)
-    log(`[Error file: ${fileName}] is not processed! File moved to error folder`)
+    log(`[Error file: ${fileName}] Error printing! File moved to error folder. Error: ${error}`)
   }
 }
 
+// Upload File
+
+async function uploadFile(filePath) {
+  const fileName = path.basename(filePath)
+
+  // Paths
+  const oldPath = path.join(dirProcessed, fileName)
+  const errPath = path.join(dirUploadError, fileName)
+  const newPath = path.join(dirUploaded, fileName)
+
+  log(`[Start Uploading] file: ${filePath}`)
+
+  const objectKey = [
+    process.env.UPLOAD_FOLDER,
+    process.env.UPLOAD_ZONE,
+    fileName
+  ].join('/')
+
+  try {
+    const buffer = fs.readFileSync(oldPath)
+    await s3Client.putObject({
+      Bucket: 'contents-inc',
+      Key: objectKey,
+      Body: buffer,
+      ContentEncoding: "base64",
+      ContentType: "image/jpg",
+      ACL: 'public-read',
+    })
+    // Move File
+    fs.renameSync(oldPath, newPath)
+    log(`[Success Upload] File uploaded ${fileName}`)
+  } catch (error) {
+    fs.renameSync(oldPath, errPath)
+    log(`[Error file: ${fileName}] Error uploading! File moved to upload-error folder. Error: ${error}`)
+  }
+}
 // Helper
 
 function dirExist(path) {
