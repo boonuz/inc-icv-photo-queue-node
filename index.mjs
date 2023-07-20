@@ -89,8 +89,10 @@ readConfig()
 
 log(`Start watching ${dirQueue} for *.jpg changes`)
 
-const watcher = watch(dir + '/queue/*.jpg')
+watch(dir + '/queue/*.jpg')
   .on('add', appendProcessQueue)
+watch(dir + '/processed/*.jpg')
+  .on('add', appendUploadQueue)
 
 // Process Queue
 
@@ -165,7 +167,6 @@ async function processFile(filePath) {
     log(`[Success Q: ${config.queueNumber}] Processed file ${fileName} > ${newFileName}`)
     config.queueNumber += 1
     saveConfig()
-    appendUploadQueue(newPath)
   } catch (error) {
     fs.renameSync(oldPath, errPath)
     log(`[Error file: ${fileName}] Error printing! File moved to error folder. Error: ${error}`)
