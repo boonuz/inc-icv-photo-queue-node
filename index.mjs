@@ -7,6 +7,7 @@ import moment from 'moment';
 import { watch } from 'chokidar'
 import { S3 } from "@aws-sdk/client-s3";
 import { EOL } from 'node:os';
+import createServer from './server.mjs'
 
 // Printer
 
@@ -51,6 +52,15 @@ const dirLog = path.join(dir, 'process.log')
 
 const logFile = fs.createWriteStream(dirLog, { flags: 'a' })
 
+process.env.DIR = dir
+process.env.DIR_QUEUE = dirQueue
+process.env.DIR_PROCESSED = dirProcessed
+process.env.DIR_UPLOADED = dirUploaded
+process.env.DIR_PROCESSERROR = dirProcessError
+process.env.DIR_UPLOADERROR = dirUploadError
+process.env.DIR_CONFIG = dirConfig
+process.env.DIR_LOG = dirLog
+
 // Directory Checks
 
 if (!dirExist(dir)) {
@@ -93,6 +103,10 @@ watch(dir + '/queue/*.jpg')
   .on('add', appendProcessQueue)
 watch(dir + '/processed/*.jpg')
   .on('add', appendUploadQueue)
+
+// Server
+
+createServer()
 
 // Process Queue
 
@@ -252,7 +266,7 @@ function print(url) {
   })
 }
 
-function log(...message) {
+export function log(...message) {
   const timestamp = moment().format('DD/MM/YYYY HH:mm:ss')
   console.log(timestamp, ...message)
   const messageStr = `[${timestamp}] ${message.join(', ')}`
