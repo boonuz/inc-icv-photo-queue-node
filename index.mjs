@@ -3,10 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import usb from 'escpos-usb';
 import dotenv from 'dotenv';
+import moment from 'moment';
 import { watch } from 'chokidar'
 import { S3 } from "@aws-sdk/client-s3";
 
+// Printer
+
 escpos.USB = usb
+const device = new escpos.USB();
+const printer = new escpos.Printer(device);
 
 // Config
 
@@ -37,6 +42,7 @@ if (args.length === 2) {
 const dir = args[2]
 const dirQueue = path.join(dir, 'queue')
 const dirProcessed = path.join(dir, 'processed')
+const dirError = path.join(dir, 'error')
 const dirConfig = path.join(dir, 'config.json')
 
 // Directory Checks
@@ -46,11 +52,15 @@ if (!dirExist(dir)) {
 }
 
 if (!dirExist(dirQueue)) {
-  throw new Error(`Path ${dirQueue} is not existed`)
+  fs.mkdirSync(dirQueue)
 }
 
 if (!dirExist(dirProcessed)) {
-  throw new Error(`Path ${dirProcessed} is not existed`)
+  fs.mkdirSync(dirProcessed)
+}
+
+if (!dirExist(dirError)) {
+  fs.mkdirSync(dirError)
 }
 
 // Config File
@@ -72,11 +82,14 @@ async function onFileChange(filePath) {
   const fileName = path.basename(filePath)
   const newFileName = `${config.queueNumber}_${random()}.jpg`
 
-  // Move file
+  // Paths
   const oldPath = path.join(dirQueue, fileName)
+  const errPath = path.join(dirError, fileName)
   const newPath = path.join(dirProcessed, newFileName)
 
-  fs.renameSync(oldPath, newPath)
+  // Status
+  let isPrintSuccess = false
+  let isUploadSuccess = false
 
   // Print
 
@@ -86,6 +99,8 @@ async function onFileChange(filePath) {
     newFileName
   ].join('/')
 
+  const printPromise = print(qrCodeUrl)
+
   // Upload File
 
   const objectKey = [
@@ -94,24 +109,42 @@ async function onFileChange(filePath) {
     newFileName
   ].join('/')
 
+  const buffer = fs.readFileSync(oldPath)
+  const uploadPromise = s3Client.putObject({
+    Bucket: 'contents-inc',
+    Key: objectKey,
+    Body: buffer,
+    ContentEncoding: "base64",
+    ContentType: "image/jpg",
+    ACL: 'public-read',
+  })
+
+  // Move file
+
   try {
-    const buffer = fs.readFileSync(newPath)
-    const response = await s3Client.putObject({
-      Bucket: 'contents-inc',
-      Key: objectKey,
-      Body: buffer,
-      ContentEncoding: "base64",
-      ContentType: "image/jpg",
-      ACL: 'public-read',
-    })
+    await Promise.all([
+      printPromise
+        .then(() => isPrintSuccess = true)
+        .catch(e => console.log(`[Error file: ${fileName}] Error printing ${e}`)),
+      uploadPromise
+        .then(() => isUploadSuccess = true)
+        .catch(e => console.log(`[Error file: ${fileName}] Error uploading file ${e}`)),
+    ])
   } catch (error) {
+    console.error(`Error processing file ${fileName}`)
     console.error(error)
   }
 
-  // Save config
-  console.log(`[Q-${config.queueNumber}] Processed file ${fileName} > ${newFileName}`)
-  config.queueNumber += 1
-  saveConfig()
+  if (isPrintSuccess && isUploadSuccess) {
+    fs.renameSync(oldPath, newPath)
+    // Save Config
+    console.log(`[Success Q: ${config.queueNumber}] Processed file ${fileName} > ${newFileName}`)
+    config.queueNumber += 1
+    saveConfig()
+  } else {
+    fs.renameSync(oldPath, errPath)
+    console.log(`[Error file: ${fileName}] is not processed! File moved to error folder`)
+  }
 }
 
 // Helper
@@ -133,4 +166,26 @@ function readConfig() {
 
 function random() {
   return Math.round((Math.random() * 1000000)).toString().padStart(6, '0')
+}
+
+function print(url) {
+  return new Promise((res, rej) => {
+    const timestamp = moment().format('DD/MM/YYYY HH:mm:ss')
+    device.open((err) => {
+      printer
+        .align('CT')
+        .text('Queue Number')
+        .size(2, 2)
+        .text(config.queueNumber)
+        .qrimage(url, () => {
+          printer
+            .newLine()
+            .size(0)
+            .text('Scan QR Code to download photo')
+            .text(timestamp)
+            .cut(true, 4)
+            .close(err => err ? rej(err) : res())
+        })
+    })
+  })
 }
