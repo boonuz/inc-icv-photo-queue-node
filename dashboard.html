@@ -1,1 +1,157 @@
-Dashboard
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photo Queue: Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.4.0/axios.min.js"
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <div id="app" class="p-5">
+    <div class="row">
+      <div class="col">
+        <h3>Dashboard</h3>
+      </div>
+      <div class="col-auto mt-1">
+        <i v-if="loading" class="fa fs-4 fa-spin fa-circle-notch"></i>
+      </div>
+      <div class="col-auto">
+        <pre class="fs-4">{{ time }}</pre>
+      </div>
+    </div>
+    <hr>
+    <div class="row">
+      <div v-for="(status, idx) of statuses" class="col">
+        <div class="card">
+          <div class="card-header">
+            <i :class="['fa me-2', status.icon, status.status]"></i>
+            {{ idx + 1 }}.
+            {{ status.title }}
+          </div>
+          <div class="card-body text-center">
+            <h1>{{ getStatus(status).length }}
+            </h1>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Statuses -->
+    <div v-for="(status, idx) of statuses">
+      <hr>
+      <h5>
+        {{ status.title }}
+        ({{ getStatus(status).length}})
+      </h5>
+      <div class="row">
+        <div class="col overflow-y-hidden overflow-x-scroll d-flex">
+          <div v-for="item of getStatus(status).slice(0, 10)"
+            class="d-inline-block me-2 border-1 border rounded-3 p-1 position-relative">
+            <img :src="`/static/${status.path}/${item}`"
+              class="rounded"
+              style="height: 150px; min-width: 200px;">
+            <div class="text-center position-absolute bottom-0 start-0 end-0 p-1 m-1 rounded bg-dark bg-opacity-75">
+              <strong class="text-white">{{ getQueue(item) }}</strong>
+            </div>
+          </div>
+          <div v-if="getStatus(status).length === 0">
+            <span class="text-muted">(No Photo)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const { createApp, ref } = Vue
+    const statuses = [
+      {
+        title: 'Queue',
+        icon: 'fa-bars',
+        status: 'text-warning',
+        key: 'queue',
+        path: 'queue',
+      },
+      {
+        title: 'Printed',
+        icon: 'fa-receipt',
+        status: 'text-info',
+        key: 'processed',
+        path: 'processed',
+      },
+      {
+        title: 'Uploaded',
+        icon: 'fa-circle-check',
+        status: 'text-success',
+        key: 'uploaded',
+        path: 'uploaded',
+      },
+      {
+        title: 'Print Error',
+        icon: 'fa-triangle-exclamation',
+        status: 'text-danger',
+        key: 'processError',
+        path: 'process-error',
+      },
+      {
+        title: 'Upload Error',
+        icon: 'fa-triangle-exclamation',
+        status: 'text-danger',
+        key: 'uploadError',
+        path: 'upload-error',
+      },
+    ]
+
+    createApp({
+      setup() {
+        // Time
+        const time = ref('')
+        const setTime = () => time.value = moment().format('DD/MM/YYYY HH:mm:ss')
+        setInterval(() => setTime(), 1000)
+        setTime()
+
+        // Fetch
+        const loading = ref(false)
+        const statusCount = ref()
+        async function fetchStatus() {
+          const { data } = await axios('/status')
+          statusCount.value = data
+        }
+        setInterval(() => fetchStatus(), 1000)
+        fetchStatus()
+
+        // Helper
+        function getStatus(status) {
+          return statusCount.value?.[status.key] || []
+        }
+
+        function getQueue(fileName) {
+          return fileName.split('_')[0]
+        }
+
+        return {
+          time,
+          loading,
+          statuses,
+          statusCount,
+          getStatus,
+          getQueue,
+        }
+      }
+    }).mount('#app')
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+    crossorigin="anonymous"></script>
+</body>
+
+</html>
