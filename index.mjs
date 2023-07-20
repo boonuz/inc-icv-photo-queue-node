@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import moment from 'moment';
 import { watch } from 'chokidar'
 import { S3 } from "@aws-sdk/client-s3";
+import { EOL } from 'node:os';
 
 // Printer
 
@@ -44,6 +45,9 @@ const dirQueue = path.join(dir, 'queue')
 const dirProcessed = path.join(dir, 'processed')
 const dirError = path.join(dir, 'error')
 const dirConfig = path.join(dir, 'config.json')
+const dirLog = path.join(dir, 'process.log')
+
+const logFile = fs.createWriteStream(dirLog, { flags: 'a' })
 
 // Directory Checks
 
@@ -73,7 +77,7 @@ readConfig()
 
 // Watcher
 
-console.log(`Start watching ${dirQueue} for *.jpg changes`)
+log(`Start watching ${dirQueue} for *.jpg changes`)
 
 const watcher = watch(dir + '/queue/*.jpg')
   .on('add', onFileChange)
@@ -125,25 +129,25 @@ async function onFileChange(filePath) {
     await Promise.all([
       printPromise
         .then(() => isPrintSuccess = true)
-        .catch(e => console.log(`[Error file: ${fileName}] Error printing ${e}`)),
+        .catch(e => log(`[Error file: ${fileName}] Error printing ${e}`)),
       uploadPromise
         .then(() => isUploadSuccess = true)
-        .catch(e => console.log(`[Error file: ${fileName}] Error uploading file ${e}`)),
+        .catch(e => log(`[Error file: ${fileName}] Error uploading file ${e}`)),
     ])
   } catch (error) {
-    console.error(`Error processing file ${fileName}`)
-    console.error(error)
+    log(`Error processing file ${fileName}`)
+    log(error)
   }
 
   if (isPrintSuccess && isUploadSuccess) {
     fs.renameSync(oldPath, newPath)
     // Save Config
-    console.log(`[Success Q: ${config.queueNumber}] Processed file ${fileName} > ${newFileName}`)
+    log(`[Success Q: ${config.queueNumber}] Processed file ${fileName} > ${newFileName}`)
     config.queueNumber += 1
     saveConfig()
   } else {
     fs.renameSync(oldPath, errPath)
-    console.log(`[Error file: ${fileName}] is not processed! File moved to error folder`)
+    log(`[Error file: ${fileName}] is not processed! File moved to error folder`)
   }
 }
 
@@ -161,7 +165,7 @@ function saveConfig() {
 function readConfig() {
   const configStr = fs.readFileSync(dirConfig, 'utf-8')
   config = JSON.parse(configStr)
-  console.log(`Config loaded queueNumber: ${config.queueNumber}`)
+  log(`Config loaded queueNumber: ${config.queueNumber}`)
 }
 
 function random() {
@@ -188,4 +192,11 @@ function print(url) {
         })
     })
   })
+}
+
+function log(...message) {
+  const timestamp = moment().format('DD/MM/YYYY HH:mm:ss')
+  console.log(timestamp, ...message)
+  const messageStr = `[${timestamp}] ${message.join(', ')}`
+  logFile.write(messageStr + EOL, 'utf-8')
 }
