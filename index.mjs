@@ -72,22 +72,33 @@ async function onFileChange(filePath) {
   const fileName = path.basename(filePath)
   const newFileName = `${config.queueNumber}_${random()}.jpg`
 
-  // Print
-  // TODO Print
-
   // Move file
   const oldPath = path.join(dirQueue, fileName)
   const newPath = path.join(dirProcessed, newFileName)
 
   fs.renameSync(oldPath, newPath)
 
+  // Print
+
+  const qrCodeUrl = [
+    'https://incs.cc/icv',
+    process.env.UPLOAD_ZONE,
+    newFileName
+  ].join('/')
+
   // Upload File
+
+  const objectKey = [
+    process.env.UPLOAD_FOLDER,
+    process.env.UPLOAD_ZONE,
+    newFileName
+  ].join('/')
 
   try {
     const buffer = fs.readFileSync(newPath)
     const response = await s3Client.putObject({
       Bucket: 'contents-inc',
-      Key: process.env.UPLOAD_ASSET_BUCKET_NAME + '/' + newFileName,
+      Key: objectKey,
       Body: buffer,
       ContentEncoding: "base64",
       ContentType: "image/jpg",
