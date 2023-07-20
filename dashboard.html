@@ -18,30 +18,74 @@
 
 <body>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <div id="app" class="p-5">
+  <div id="app" class="p-3">
     <div class="row">
       <div class="col">
-        <h3>Dashboard</h3>
+        <h2>
+          <strong>Dashboard</strong>
+        </h2>
       </div>
       <div class="col-auto mt-1">
         <i v-if="loading" class="fa fs-4 fa-spin fa-circle-notch"></i>
       </div>
       <div class="col-auto">
-        <pre class="fs-4">{{ time }}</pre>
+        <pre class="fs-4 mb-0">{{ time }}</pre>
       </div>
     </div>
     <hr>
     <div class="row">
-      <div v-for="(status, idx) of statuses" class="col">
+      <div class="col">
+        <div class="row">
+          <div v-for="(status, idx) of statuses" class="col-4">
+            <div class="card mb-3">
+              <div class="card-header">
+                <div class="row">
+                  <div class="col">
+                    <i :class="['fa me-2', status.icon, status.status]"></i>
+                    <strong>{{ status.title }}</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body text-center">
+                <h1>{{ getStatus(status).length }}
+                </h1>
+              </div>
+              <div v-if="status.path.includes('error') && getStatus(status).length > 0" class="card-footer">
+                <div class="col-auto">
+                  <button class="btn btn-sm btn-link text-danger p-0 m-0"
+                    @click.prevent="retry(status)">
+                    <i class="fa fa-rotate-right"></i>
+                    Retry
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-7">
         <div class="card">
           <div class="card-header">
-            <i :class="['fa me-2', status.icon, status.status]"></i>
-            {{ idx + 1 }}.
-            {{ status.title }}
+            <div class="row">
+              <div class="col">
+                <strong>
+                  Logs
+                </strong>
+              </div>
+              <div class="col-auto font-monospace">
+                <small>Last Updated: {{ lastUpdate }}</small>
+              </div>
+            </div>
           </div>
-          <div class="card-body text-center">
-            <h1>{{ getStatus(status).length }}
-            </h1>
+          <div class="card-body font-monospace text-nowrap overflow-scroll">
+            <div v-for="item of statusCount?.logs || []">
+              <small :class="{ 
+                'text-danger': item.toLowerCase().includes('[error'),
+                'text-success': item.toLowerCase().includes('[success'),
+              }">
+                {{ item }}
+              </small>
+            </div>
           </div>
         </div>
       </div>
@@ -121,13 +165,25 @@
 
         // Fetch
         const loading = ref(false)
+        const lastUpdate = ref('')
         const statusCount = ref()
         async function fetchStatus() {
           const { data } = await axios('/status')
           statusCount.value = data
+          lastUpdate.value = moment().format('DD/MM/YYYY HH:mm:ss')
         }
-        setInterval(() => fetchStatus(), 1000)
+        setInterval(() => fetchStatus(), 1500)
         fetchStatus()
+
+        async function retry(status) {
+          const body = { path: status.path }
+          try {
+            await axios.post('/retry', body)
+            alert('Success')
+          } catch (error) {
+            alert('Error ' + error)
+          }
+        }
 
         // Helper
         function getStatus(status) {
@@ -143,8 +199,10 @@
           loading,
           statuses,
           statusCount,
+          lastUpdate,
           getStatus,
           getQueue,
+          retry,
         }
       }
     }).mount('#app')

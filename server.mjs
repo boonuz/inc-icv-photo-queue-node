@@ -1,10 +1,12 @@
 import express from 'express'
+import readLast from 'read-last-lines'
 import path from 'node:path'
 import { log } from './index.mjs'
-import { readdirSync } from 'node:fs'
+import { readdirSync, renameSync } from 'node:fs'
 
 export default function createServer() {
   const app = express()
+  app.use(express.json())
 
   // Paths
 
@@ -24,30 +26,66 @@ export default function createServer() {
     res.sendFile(html)
   })
 
-  app.get('/status', (req, res) => {
-    const info = getDirsInfo()
+  app.get('/status', async (req, res) => {
+    const info = await getDirsInfo()
     res.send(info)
   })
-  app.use('/static', express.static(path.resolve(dir)))
+
+  app.post('/retry', (req, res) => {
+    const { path } = req.body
+
+    if (path === undefined) {
+      throw new Error('"path" is required')
+    }
+
+    if (path === 'process-error') {
+      retry(dirProcessError, dirQueue)
+    } else if (path === 'upload-error') {
+      retry(dirUploadError, dirProcessed)
+    } else {
+      throw new Error('"path" is invalid')
+    }
+
+    res.send({ message: 'ok' })
+  })
+
 
   // Bootstrap
 
+  app.use('/static', express.static(path.resolve(dir)))
   app.listen(3000, () => logServer('Server listening :3000'))
 
   // Helpers
 
-  function getDirsInfo() {
+  async function getDirsInfo() {
     return {
       queue: readDirInfo(dirQueue),
       processed: readDirInfo(dirProcessed),
       uploaded: readDirInfo(dirUploaded),
       processError: readDirInfo(dirProcessError),
       uploadError: readDirInfo(dirUploadError),
+      logs: await readLog()
     }
   }
 
   function readDirInfo(path) {
-    return readdirSync(path).filter(f => !f.startsWith('.'))
+    return readdirSync(path).filter(f => !f.startsWith('.')).reverse()
+  }
+
+  async function readLog() {
+    const lines = await readLast.read(dirLog, 10, 'utf-8')
+    return lines.split('\n')
+  }
+
+  function retry(dir, newDir) {
+    const files = readDirInfo(dir)
+    logServer(`Retrying files ${dir} > ${newDir}`)
+    files.forEach(fileName => {
+      const oldPath = path.join(dir, fileName)
+      const newPath = path.join(newDir, fileName)
+      renameSync(oldPath, newPath)
+      logServer(`File retry ${oldPath} > ${newPath}`)
+    })
   }
 }
 

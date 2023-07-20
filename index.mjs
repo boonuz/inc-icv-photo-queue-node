@@ -269,6 +269,6 @@ function print(url) {
 export function log(...message) {
   const timestamp = moment().format('DD/MM/YYYY HH:mm:ss')
   console.log(timestamp, ...message)
-  const messageStr = `[${timestamp}] ${message.join(', ')}`
+  const messageStr = `[${timestamp}] ${message.join(' ')}`
   logFile.write(messageStr + EOL, 'utf-8')
 }
