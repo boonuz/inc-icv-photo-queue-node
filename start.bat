@@ -1,0 +1,1 @@
+node index.mjs ./photos path-to-camera
