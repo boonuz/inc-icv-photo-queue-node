@@ -104,9 +104,9 @@ readConfig()
 
 log(`Start watching ${dirQueue} for *.jpg changes`)
 
-watch(targetDir + '/*.jpg', { ignoreInitial: true })
+watch(targetDir + '/*.JPG', { ignoreInitial: true })
   .on('add', copyToQueue)
-watch(dir + '/queue/*.jpg')
+watch(dir + '/queue/*.JPG')
   .on('add', appendProcessQueue)
 watch(dir + '/processed/*.jpg')
   .on('add', appendUploadQueue)

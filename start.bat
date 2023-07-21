@@ -1,1 +1,1 @@
-node index.mjs ./photos path-to-camera
+node index.mjs ./photos ./tempPhotos
