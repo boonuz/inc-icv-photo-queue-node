@@ -42,6 +42,7 @@ if (args.length === 2) {
 }
 
 const dir = args[2]
+const targetDir = args[3]
 const dirQueue = path.join(dir, 'queue')
 const dirProcessed = path.join(dir, 'processed')
 const dirUploaded = path.join(dir, 'uploaded')
@@ -65,6 +66,10 @@ process.env.DIR_LOG = dirLog
 
 if (!dirExist(dir)) {
   throw new Error(`Path ${dir} is not existed`)
+}
+
+if (!dirExist(targetDir)) {
+  throw new Error(`Path ${targetDir} is not existed`)
 }
 
 if (!dirExist(dirQueue)) {
@@ -99,6 +104,8 @@ readConfig()
 
 log(`Start watching ${dirQueue} for *.jpg changes`)
 
+watch(targetDir + '/*.jpg', { ignoreInitial: true })
+  .on('add', copyToQueue)
 watch(dir + '/queue/*.jpg')
   .on('add', appendProcessQueue)
 watch(dir + '/processed/*.jpg')
@@ -150,6 +157,14 @@ async function drainUploadQueue() {
   const filePath = uploadQueue.shift()
   await uploadFile(filePath)
   return await drainUploadQueue()
+}
+
+// CopyToQueue
+
+async function copyToQueue(filePath) {
+  const fileName = path.basename(filePath)
+  const newPath = path.join(dirQueue, fileName)
+  fs.copyFileSync(filePath, newPath)
 }
 
 // Process File
