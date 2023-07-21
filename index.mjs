@@ -4,6 +4,7 @@ import path from 'node:path';
 import usb from 'escpos-usb';
 import dotenv from 'dotenv';
 import moment from 'moment';
+import nodeCmd from 'node-cmd';
 import { watch } from 'chokidar'
 import { S3 } from "@aws-sdk/client-s3";
 import { EOL } from 'node:os';
@@ -103,6 +104,10 @@ readConfig()
 // Watcher
 
 log(`Start watching ${dirQueue} for *.jpg changes`)
+
+setInterval(() => {
+  nodeCmd.run("./run_sync_file.bat")
+}, 1000)
 
 watch(targetDir + '/*.JPG', { ignoreInitial: true })
   .on('add', copyToQueue)

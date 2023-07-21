@@ -1,0 +1,1 @@
+"C:\Program Files\FreeFileSync\FreeFileSync.exe" "SyncSettings.ffs_batch"
