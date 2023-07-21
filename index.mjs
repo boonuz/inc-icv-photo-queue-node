@@ -105,16 +105,20 @@ readConfig()
 
 log(`Start watching ${dirQueue} for *.jpg changes`)
 
-setInterval(() => {
-  nodeCmd.run("./run_sync_file.bat")
-}, 1000)
-
 watch(targetDir + '/*.JPG', { ignoreInitial: true })
   .on('add', copyToQueue)
 watch(dir + '/queue/*.JPG')
   .on('add', appendProcessQueue)
 watch(dir + '/processed/*.jpg')
   .on('add', appendUploadQueue)
+
+setInterval(() => {
+  nodeCmd.run("run_sync_file.bat", (error, data, stdErr) => {
+    if (error || stdErr) {
+      console.log(error, stdErr)
+    }
+  })
+}, 1500)
 
 // Server
 
