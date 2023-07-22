@@ -73,7 +73,7 @@ export default function createServer() {
   }
 
   async function readLog() {
-    const lines = await readLast.read(dirLog, 10, 'utf-8')
+    const lines = await readLast.read(dirLog, 8, 'utf-8')
     return lines.split('\n')
   }
 

@@ -113,11 +113,7 @@ watch(dir + '/processed/*.jpg')
   .on('add', appendUploadQueue)
 
 setInterval(() => {
-  nodeCmd.run("run_sync_file.bat", (error, data, stdErr) => {
-    if (error || stdErr) {
-      console.log(error, stdErr)
-    }
-  })
+    nodeCmd.run("run_sync_file.bat", err => err ? log('[Warning] Sync file error ' + err.toString().trim()) : null)
 }, 1500)
 
 // Server

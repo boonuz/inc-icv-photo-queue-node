@@ -82,6 +82,7 @@
               <small :class="{ 
                 'text-danger': item.toLowerCase().includes('[error'),
                 'text-success': item.toLowerCase().includes('[success'),
+                'text-warning': item.toLowerCase().includes('[warning'),
               }">
                 {{ item }}
               </small>
@@ -103,9 +104,9 @@
             class="d-inline-block me-2 border-1 border rounded-3 p-1 position-relative">
             <img :src="`/static/${status.path}/${item}`"
               class="rounded"
-              style="height: 150px; min-width: 200px;">
-            <div class="text-center position-absolute bottom-0 start-0 end-0 p-1 m-1 rounded bg-dark bg-opacity-75">
-              <strong class="text-white">{{ getQueue(item) }}</strong>
+              style="height: 200px; min-width: 266px;">
+            <div class="text-center position-absolute bottom-0 start-0 end-0 p-1 m-1 rounded bg-dark bg-opacity-50">
+              <strong class="text-white fs-3">{{ getQueue(item) }}</strong>
             </div>
           </div>
           <div v-if="getStatus(status).length === 0">
