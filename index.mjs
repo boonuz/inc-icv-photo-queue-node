@@ -176,7 +176,7 @@ async function copyToQueue(filePath) {
 
 async function processFile(filePath) {
   const fileName = path.basename(filePath)
-  const newFileName = `${config.queueNumber}_${random()}.jpg`
+  const newFileName = `${config.queueNumber.toString().padStart(4, "0")}_${random()}.jpg`
 
   // Paths
   const oldPath = path.join(dirQueue, fileName)
